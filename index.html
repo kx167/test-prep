@@ -155,7 +155,12 @@ async function ann(){const t=$('#at').value.trim(),b=$('#ab').value.trim();if(!t
 
 /* ---------- views ---------- */
 function loginV(){return `<div class="card" style="max-width:360px;margin:10vh auto"><h2>NIMCET Practice</h2>${fl()}<input id="lu" placeholder="User ID" autocomplete="username"><input id="lp" type="password" placeholder="Password" autocomplete="current-password"><button class="btn" onclick="login()">Log in</button></div>`}
-function unread(){return DB.nt.filter(n=>!DB.rd.includes(n.id)).length}
+const clrKey=()=>'clr_'+(me&&me.id);
+const cleared=()=>{try{return JSON.parse(localStorage.getItem(clrKey())||'[]')}catch(e){return[]}};
+const setCleared=a=>{try{localStorage.setItem(clrKey(),JSON.stringify(a))}catch(e){}};
+function clearAlerts(){if(!confirm('Clear all alerts from this list?'))return;setCleared([...new Set(cleared().concat(DB.nt.map(n=>n.id)))]);R()}
+function clearAlert(id){setCleared([...new Set(cleared().concat([id]))]);R()}
+function unread(){const c=cleared();return DB.nt.filter(n=>!DB.rd.includes(n.id)&&!c.includes(n.id)).length}
 function head(){const T=me.role==='admin'?[['add','Questions'],['users','Users'],['req','Key requests'],['chat','Chat'],['ann','Announce'],['acc','Account']]:[['prac','Practice'],['prog','Progress'],['chat','Chat'],['nt','Alerts'+(unread()?' ('+unread()+')':'')],['acc','Account']];
  return `<div class="top"><b>NIMCET Practice</b><span>${esc(me.u)} <button class="btn s" onclick="out()">Log out</button></span></div><div class="nav">${T.map(t=>`<button class="tab${tab===t[0]?' on':''}" onclick="go('${t[0]}')">${t[1]}</button>`).join('')}</div>`+fl()}
 function addV(){return sub.sb?admTopicV():sub.topic?admStV():admHomeV()}
@@ -210,9 +215,9 @@ function resV(){const at=DB.at.find(a=>a.id===sub.res),{Q,res,KY}=sub.rd,r=reqOf
 function progV(){const g={},mine=DB.at.filter(a=>a.u===me.u);mine.forEach(a=>{const k=(a.sb||a.topic)+' · '+a.lvl;(g[k]=g[k]||[]).push(Math.round(a.score/a.total*100))});
  const E=Object.entries(g).map(([k,v])=>[k,v.length,Math.round(v.reduce((x,y)=>x+y,0)/v.length),Math.max(...v)]).sort((a,b)=>a[2]-b[2]);
  return `<div class="card"><b>${mine.length} attempts</b><p class="m">Weakest topics come first.</p></div>`+(E.map(e=>`<div class="card"><div class="row"><b>${esc(e[0])}</b><span class="m">${e[1]} attempts · best ${e[3]}%</span></div><div class="bar"><i style="width:${e[2]}%"></i></div><small class="m">Average ${e[2]}%</small></div>`).join('')||'<div class="card">Finish a set to see your progress.</div>')}
-function ntV(){const L=DB.nt,un=L.filter(n=>!DB.rd.includes(n.id));
+function ntV(){const c=cleared(),L=DB.nt.filter(n=>!c.includes(n.id)),un=L.filter(n=>!DB.rd.includes(n.id));
  if(un.length){SB.from('notification_reads').upsert(un.map(n=>({notification_id:n.id})),{onConflict:'user_id,notification_id',ignoreDuplicates:true}).then(()=>{DB.rd=DB.rd.concat(un.map(n=>n.id))})}
- return L.map(n=>`<div class="card"><b>${esc(n.t)}</b><p>${esc(n.b||'')}</p><small class="m">${new Date(n.ts).toLocaleString()}</small></div>`).join('')||'<div class="card">No alerts yet.</div>'}
+ return (L.length?`<div class="row" style="margin-bottom:10px"><span class="m">${L.length} alert${L.length>1?'s':''}</span><button class="btn s" onclick="clearAlerts()">Clear all</button></div>`:'')+L.map(n=>`<div class="card"><div class="row"><b>${esc(n.t)}</b><button class="btn s" style="min-height:30px;padding:2px 10px" aria-label="Dismiss alert" onclick="clearAlert(${n.id})">✕</button></div><p>${esc(n.b||'')}</p><small class="m">${new Date(n.ts).toLocaleString()}</small></div>`).join('')||'<div class="card">No alerts yet.</div>'}
 function chatV(){const adm=me.role==='admin',th=adm?sub.th:me.id;
  if(adm&&!th){const U=DB.users.map((u,i)=>[u,i]).filter(x=>x[0].role!=='admin');return `<div class="card"><b>Student chats</b>${U.map(([u,i])=>{const l=DB.ms.filter(m=>m.th===u.id).pop();return `<div class="row"><button class="btn s" onclick="sub.th=DB.users[${i}].id;R()">${esc(u.u)}</button><span class="m">${l?esc(l.body.slice(0,40)):'No messages'}</span></div>`}).join('')||'<p class="m">No students yet.</p>'}</div>`}
  const nm=adm?(DB.users.find(u=>u.id===th)||{}).u:'';
